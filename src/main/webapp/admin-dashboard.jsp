@@ -234,6 +234,31 @@
 
                                             </div>
                                         </div>
+                                        
+                                        <!-- Matched Donors Section -->
+                                        <c:if test="${not empty req.matches}">
+                                            <div class="mt-4 pt-4 border-t border-white/5 space-y-2">
+                                                <h4 class="text-[10px] font-bold text-gray-500 uppercase tracking-wider">Matched Donors Status</h4>
+                                                <div class="flex flex-wrap gap-2">
+                                                    <c:forEach var="match" items="${req.matches}">
+                                                        <div class="px-3 py-1.5 bg-white/5 border border-white/5 rounded-xl text-xs flex items-center gap-2">
+                                                            <span class="text-gray-300 font-medium"><c:out value="${match.donorName}"/></span>
+                                                            <c:choose>
+                                                                <c:when test="${match.status == 'ACCEPTED'}">
+                                                                    <span class="px-1.5 py-0.5 rounded text-[8px] font-extrabold bg-emerald-500/20 text-emerald-400 border border-emerald-500/30 uppercase tracking-wider">Accepted Match</span>
+                                                                </c:when>
+                                                                <c:when test="${match.status == 'DECLINED'}">
+                                                                    <span class="px-1.5 py-0.5 rounded text-[8px] font-extrabold bg-red-500/20 text-red-400 border border-red-500/30 uppercase tracking-wider">Declined Match</span>
+                                                                </c:when>
+                                                                <c:otherwise>
+                                                                    <span class="px-1.5 py-0.5 rounded text-[8px] font-extrabold bg-white/5 text-gray-400 border border-white/10 uppercase tracking-wider">Pending Response</span>
+                                                                </c:otherwise>
+                                                            </c:choose>
+                                                        </div>
+                                                    </c:forEach>
+                                                </div>
+                                            </div>
+                                        </c:if>
                                     </div>
                                 </c:forEach>
                             </div>

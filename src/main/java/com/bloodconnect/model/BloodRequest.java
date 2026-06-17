@@ -136,4 +136,15 @@ public class BloodRequest {
     public void setRequesterName(String requesterName) {
         this.requesterName = requesterName;
     }
+
+    // Transient field for display — matching records
+    private java.util.List<com.bloodconnect.model.DonorMatch> matches;
+
+    public java.util.List<com.bloodconnect.model.DonorMatch> getMatches() {
+        return matches;
+    }
+
+    public void setMatches(java.util.List<com.bloodconnect.model.DonorMatch> matches) {
+        this.matches = matches;
+    }
 }

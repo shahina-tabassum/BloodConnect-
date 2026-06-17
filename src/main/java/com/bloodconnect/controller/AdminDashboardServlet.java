@@ -2,6 +2,7 @@ package com.bloodconnect.controller;
 
 import com.bloodconnect.dao.RequestDAO;
 import com.bloodconnect.dao.UserDAO;
+import com.bloodconnect.dao.MatchDAO;
 import com.bloodconnect.model.BloodRequest;
 import com.bloodconnect.model.User;
 
@@ -24,6 +25,7 @@ public class AdminDashboardServlet extends HttpServlet {
 
     private final RequestDAO requestDAO = new RequestDAO();
     private final UserDAO userDAO = new UserDAO();
+    private final MatchDAO matchDAO = new MatchDAO();
 
     @Override
     protected void doGet(HttpServletRequest request, HttpServletResponse response)
@@ -43,6 +45,9 @@ public class AdminDashboardServlet extends HttpServlet {
 
         try {
             List<BloodRequest> requests = requestDAO.getAllRequests();
+            for (BloodRequest req : requests) {
+                req.setMatches(matchDAO.getMatchesByRequest(req.getRequestId()));
+            }
             List<User> users = userDAO.getAllUsers();
 
             request.setAttribute("requests", requests);
