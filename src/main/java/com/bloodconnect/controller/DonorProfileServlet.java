@@ -7,6 +7,8 @@ import com.bloodconnect.model.DonorProfile;
 import com.bloodconnect.model.User;
 import com.bloodconnect.model.DonorMatch;
 import com.bloodconnect.util.CityList;
+import com.google.gson.Gson;
+import com.google.gson.GsonBuilder;
 
 import javax.servlet.ServletException;
 import javax.servlet.annotation.WebServlet;
@@ -19,12 +21,14 @@ import java.sql.Date;
 import java.sql.SQLException;
 import java.text.ParseException;
 import java.text.SimpleDateFormat;
+import java.util.HashMap;
 import java.util.List;
+import java.util.Map;
 
 /**
  * Handles donor profile view and updates.
- * GET  /donor/profile → shows donor dashboard with profile edit form and matching history
- * POST /donor/profile → updates donor profile and toggles availability
+ * GET  /donor/profile → returns donor details, eligibility, matches history in JSON
+ * POST /donor/profile → updates donor profile, toggles availability, or updates match status
  */
 @WebServlet("/donor/profile")
 public class DonorProfileServlet extends HttpServlet {
@@ -32,18 +36,24 @@ public class DonorProfileServlet extends HttpServlet {
     private final UserDAO userDAO = new UserDAO();
     private final DonorDAO donorDAO = new DonorDAO();
     private final MatchDAO matchDAO = new MatchDAO();
+    private final Gson gson = new GsonBuilder().setDateFormat("yyyy-MM-dd").create();
 
     @Override
     protected void doGet(HttpServletRequest request, HttpServletResponse response)
             throws ServletException, IOException {
 
+        response.setContentType("application/json");
+        response.setCharacterEncoding("UTF-8");
+
         HttpSession session = request.getSession(false);
         if (session == null || session.getAttribute("userId") == null) {
-            response.sendRedirect(request.getContextPath() + "/login");
+            response.setStatus(HttpServletResponse.SC_UNAUTHORIZED);
+            response.getWriter().write("{\"error\": \"Unauthorized\"}");
             return;
         }
 
         int userId = (int) session.getAttribute("userId");
+        Map<String, Object> result = new HashMap<>();
 
         try {
             User user = userDAO.findById(userId);
@@ -51,7 +61,10 @@ public class DonorProfileServlet extends HttpServlet {
             List<DonorMatch> matches = matchDAO.getMatchesByDonor(userId);
 
             if (user == null) {
-                response.sendRedirect(request.getContextPath() + "/logout");
+                response.setStatus(HttpServletResponse.SC_NOT_FOUND);
+                result.put("success", false);
+                result.put("message", "User not found");
+                response.getWriter().write(gson.toJson(result));
                 return;
             }
 
@@ -75,30 +88,22 @@ public class DonorProfileServlet extends HttpServlet {
                 isEligible = daysSinceLastDonation > 90;
             }
 
-            request.setAttribute("user", user);
-            request.setAttribute("profile", profile);
-            request.setAttribute("matches", matches);
-            request.setAttribute("cities", CityList.CITIES);
-            request.setAttribute("daysSinceLastDonation", daysSinceLastDonation);
-            request.setAttribute("isEligible", isEligible);
+            result.put("success", true);
+            result.put("user", user);
+            result.put("profile", profile);
+            result.put("matches", matches);
+            result.put("cities", CityList.CITIES);
+            result.put("daysSinceLastDonation", daysSinceLastDonation);
+            result.put("isEligible", isEligible);
 
-            // Fetch flash message if any
-            String success = (String) session.getAttribute("successMsg");
-            if (success != null) {
-                request.setAttribute("success", success);
-                session.removeAttribute("successMsg");
-            }
-            String error = (String) session.getAttribute("errorMsg");
-            if (error != null) {
-                request.setAttribute("error", error);
-                session.removeAttribute("errorMsg");
-            }
-
-            request.getRequestDispatcher("/donor-dashboard.jsp").forward(request, response);
+            response.getWriter().write(gson.toJson(result));
 
         } catch (SQLException e) {
             e.printStackTrace();
-            response.sendRedirect(request.getContextPath() + "/error.jsp");
+            response.setStatus(HttpServletResponse.SC_INTERNAL_SERVER_ERROR);
+            result.put("success", false);
+            result.put("message", "Database error occurred while loading profile.");
+            response.getWriter().write(gson.toJson(result));
         }
     }
 
@@ -106,36 +111,43 @@ public class DonorProfileServlet extends HttpServlet {
     protected void doPost(HttpServletRequest request, HttpServletResponse response)
             throws ServletException, IOException {
 
+        response.setContentType("application/json");
+        response.setCharacterEncoding("UTF-8");
+
         HttpSession session = request.getSession(false);
         if (session == null || session.getAttribute("userId") == null) {
-            response.sendRedirect(request.getContextPath() + "/login");
+            response.setStatus(HttpServletResponse.SC_UNAUTHORIZED);
+            response.getWriter().write("{\"error\": \"Unauthorized\"}");
             return;
         }
 
         int userId = (int) session.getAttribute("userId");
         String action = request.getParameter("action");
+        Map<String, Object> result = new HashMap<>();
 
         try {
             if ("toggleAvailability".equals(action)) {
-                // Quick availability toggle action
                 boolean isAvailable = Boolean.parseBoolean(request.getParameter("isAvailable"));
                 donorDAO.toggleAvailability(userId, isAvailable);
-                session.setAttribute("successMsg", "Availability updated successfully.");
-                response.sendRedirect(request.getContextPath() + "/donor/profile");
+                result.put("success", true);
+                result.put("message", "Availability updated successfully.");
+                response.getWriter().write(gson.toJson(result));
                 return;
             }
 
             if ("updateMatchStatus".equals(action)) {
-                // Quick match status update (Accept/Decline)
                 int matchId = Integer.parseInt(request.getParameter("matchId"));
                 String status = request.getParameter("status");
                 if ("ACCEPTED".equals(status) || "DECLINED".equals(status)) {
                     matchDAO.updateMatchStatus(matchId, status);
-                    session.setAttribute("successMsg", "Match request " + status.toLowerCase() + ".");
+                    result.put("success", true);
+                    result.put("message", "Match request " + status.toLowerCase() + ".");
                 } else {
-                    session.setAttribute("errorMsg", "Invalid status update.");
+                    response.setStatus(HttpServletResponse.SC_BAD_REQUEST);
+                    result.put("success", false);
+                    result.put("message", "Invalid status update.");
                 }
-                response.sendRedirect(request.getContextPath() + "/donor/profile");
+                response.getWriter().write(gson.toJson(result));
                 return;
             }
 
@@ -146,7 +158,7 @@ public class DonorProfileServlet extends HttpServlet {
             String city = trim(request.getParameter("city"));
             String pincode = trim(request.getParameter("pincode"));
             String lastDonationDateStr = trim(request.getParameter("lastDonationDate"));
-            boolean isAvailable = request.getParameter("isAvailable") != null; // checkbox checked
+            boolean isAvailable = request.getParameter("isAvailable") != null && Boolean.parseBoolean(request.getParameter("isAvailable"));
 
             StringBuilder errors = new StringBuilder();
 
@@ -180,7 +192,6 @@ public class DonorProfileServlet extends HttpServlet {
                     java.util.Date parsedDate = sdf.parse(lastDonationDateStr);
                     lastDonationDate = new Date(parsedDate.getTime());
 
-                    // Check that the donation date is not in the future
                     if (lastDonationDate.after(new java.util.Date())) {
                         errors.append("Last donation date cannot be in the future. ");
                     }
@@ -190,8 +201,10 @@ public class DonorProfileServlet extends HttpServlet {
             }
 
             if (errors.length() > 0) {
-                session.setAttribute("errorMsg", errors.toString().trim());
-                response.sendRedirect(request.getContextPath() + "/donor/profile");
+                response.setStatus(HttpServletResponse.SC_BAD_REQUEST);
+                result.put("success", false);
+                result.put("message", errors.toString().trim());
+                response.getWriter().write(gson.toJson(result));
                 return;
             }
 
@@ -208,13 +221,16 @@ public class DonorProfileServlet extends HttpServlet {
 
             donorDAO.updateProfile(dp);
 
-            session.setAttribute("successMsg", "Profile updated successfully.");
-            response.sendRedirect(request.getContextPath() + "/donor/profile");
+            result.put("success", true);
+            result.put("message", "Profile updated successfully.");
+            response.getWriter().write(gson.toJson(result));
 
         } catch (SQLException e) {
             e.printStackTrace();
-            session.setAttribute("errorMsg", "Failed to update profile due to database error.");
-            response.sendRedirect(request.getContextPath() + "/donor/profile");
+            response.setStatus(HttpServletResponse.SC_INTERNAL_SERVER_ERROR);
+            result.put("success", false);
+            result.put("message", "Failed to update profile due to database error.");
+            response.getWriter().write(gson.toJson(result));
         }
     }
 

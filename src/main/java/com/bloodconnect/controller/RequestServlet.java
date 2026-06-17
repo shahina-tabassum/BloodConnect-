@@ -6,6 +6,7 @@ import com.bloodconnect.dao.RequestDAO;
 import com.bloodconnect.model.BloodRequest;
 import com.bloodconnect.model.DonorProfile;
 import com.bloodconnect.util.CityList;
+import com.google.gson.Gson;
 
 import javax.servlet.ServletException;
 import javax.servlet.annotation.WebServlet;
@@ -15,12 +16,14 @@ import javax.servlet.http.HttpServletResponse;
 import javax.servlet.http.HttpSession;
 import java.io.IOException;
 import java.sql.SQLException;
+import java.util.HashMap;
 import java.util.List;
+import java.util.Map;
 
 /**
  * Handles creation of new blood requests.
- * GET  /request/new → shows request form
- * POST /request/new → validates, saves request, auto-matches available donors, and redirects to list
+ * GET  /request/new → returns Indian cities dropdown list in JSON
+ * POST /request/new → validates, saves request, auto-matches available donors, and returns JSON stats
  */
 @WebServlet("/request/new")
 public class RequestServlet extends HttpServlet {
@@ -28,28 +31,33 @@ public class RequestServlet extends HttpServlet {
     private final RequestDAO requestDAO = new RequestDAO();
     private final DonorDAO donorDAO = new DonorDAO();
     private final MatchDAO matchDAO = new MatchDAO();
+    private final Gson gson = new Gson();
 
     @Override
     protected void doGet(HttpServletRequest request, HttpServletResponse response)
             throws ServletException, IOException {
-
-        request.setAttribute("cities", CityList.CITIES);
-        request.getRequestDispatcher("/request-form.jsp").forward(request, response);
+        response.setContentType("application/json");
+        response.setCharacterEncoding("UTF-8");
+        response.getWriter().write(gson.toJson(CityList.CITIES));
     }
 
     @Override
     protected void doPost(HttpServletRequest request, HttpServletResponse response)
             throws ServletException, IOException {
 
+        response.setContentType("application/json");
+        response.setCharacterEncoding("UTF-8");
+
         HttpSession session = request.getSession(false);
         if (session == null || session.getAttribute("userId") == null) {
-            response.sendRedirect(request.getContextPath() + "/login");
+            response.setStatus(HttpServletResponse.SC_UNAUTHORIZED);
+            response.getWriter().write("{\"error\": \"Unauthorized\"}");
             return;
         }
 
         int requesterId = (int) session.getAttribute("userId");
 
-        // Retrieve form fields
+        // Retrieve inputs
         String patientName = trim(request.getParameter("patientName"));
         String bloodGroupNeeded = trim(request.getParameter("bloodGroupNeeded"));
         String unitsStr = trim(request.getParameter("unitsRequired"));
@@ -57,6 +65,7 @@ public class RequestServlet extends HttpServlet {
         String city = trim(request.getParameter("city"));
         String urgency = trim(request.getParameter("urgency"));
 
+        Map<String, Object> result = new HashMap<>();
         StringBuilder errors = new StringBuilder();
 
         if (isEmpty(patientName)) {
@@ -90,16 +99,10 @@ public class RequestServlet extends HttpServlet {
         }
 
         if (errors.length() > 0) {
-            request.setAttribute("error", errors.toString().trim());
-            request.setAttribute("cities", CityList.CITIES);
-            // Preserve form values
-            request.setAttribute("formPatientName", patientName);
-            request.setAttribute("formBloodGroup", bloodGroupNeeded);
-            request.setAttribute("formUnits", unitsStr);
-            request.setAttribute("formHospitalName", hospitalName);
-            request.setAttribute("formCity", city);
-            request.setAttribute("formUrgency", urgency);
-            request.getRequestDispatcher("/request-form.jsp").forward(request, response);
+            response.setStatus(HttpServletResponse.SC_BAD_REQUEST);
+            result.put("success", false);
+            result.put("message", errors.toString().trim());
+            response.getWriter().write(gson.toJson(result));
             return;
         }
 
@@ -125,22 +128,24 @@ public class RequestServlet extends HttpServlet {
             List<DonorProfile> eligibleDonors = donorDAO.findEligibleDonors(bloodGroupNeeded, city);
             int matchCount = 0;
             for (DonorProfile donor : eligibleDonors) {
-                // Ensure no duplicate matches
                 if (!matchDAO.matchExists(requestId, donor.getDonorId())) {
                     matchDAO.createMatch(requestId, donor.getDonorId());
                     matchCount++;
                 }
             }
 
-            // Store status in session flash message
-            session.setAttribute("successMsg", "Blood request posted successfully! Found " + matchCount + " potential match(es). Pending admin verification.");
-            response.sendRedirect(request.getContextPath() + "/request/list");
+            result.put("success", true);
+            result.put("message", "Blood request posted successfully!");
+            result.put("matchCount", matchCount);
+            result.put("requestId", requestId);
+            response.getWriter().write(gson.toJson(result));
 
         } catch (SQLException e) {
             e.printStackTrace();
-            request.setAttribute("error", "Database error occurred while processing request.");
-            request.setAttribute("cities", CityList.CITIES);
-            request.getRequestDispatcher("/request-form.jsp").forward(request, response);
+            response.setStatus(HttpServletResponse.SC_INTERNAL_SERVER_ERROR);
+            result.put("success", false);
+            result.put("message", "Failed to update profile due to database error.");
+            response.getWriter().write(gson.toJson(result));
         }
     }
 

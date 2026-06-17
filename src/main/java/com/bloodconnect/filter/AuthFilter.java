@@ -25,12 +25,12 @@ public class AuthFilter implements Filter {
 
     /** URLs that don't require authentication */
     private static final List<String> PUBLIC_URLS = Arrays.asList(
-        "/login", "/register", "/logout", "/", "/index.jsp"
+        "/login", "/register", "/logout", "/", "/index.html", "/login.html", "/register.html", "/error.html"
     );
 
     /** Static asset prefixes that don't require authentication */
     private static final List<String> STATIC_PREFIXES = Arrays.asList(
-        "/css/", "/js/", "/images/", "/favicon.ico"
+        "/css/", "/js/", "/images/", "/screenshots/", "/favicon.ico"
     );
 
     @Override
@@ -57,32 +57,58 @@ public class AuthFilter implements Filter {
         // Check authentication
         HttpSession session = request.getSession(false);
         if (session == null || session.getAttribute("userId") == null) {
-            response.sendRedirect(request.getContextPath() + "/login");
+            if (isApiRequest(path)) {
+                response.setStatus(HttpServletResponse.SC_UNAUTHORIZED);
+                response.setContentType("application/json");
+                response.getWriter().write("{\"error\": \"Unauthorized. Please log in.\"}");
+            } else {
+                response.sendRedirect(request.getContextPath() + "/login.html");
+            }
             return;
         }
 
         String role = (String) session.getAttribute("role");
 
         // Role-based authorization
-        if (path.startsWith("/admin/") || path.equals("/admin")) {
+        boolean authorized = true;
+        if (path.startsWith("/admin/") || path.equals("/admin") || path.equals("/admin-dashboard.html")) {
             if (!"ADMIN".equals(role)) {
-                response.sendRedirect(request.getContextPath() + "/login?error=unauthorized");
-                return;
+                authorized = false;
             }
-        } else if (path.startsWith("/donor/") || path.equals("/donor")) {
+        } else if (path.startsWith("/donor/") || path.equals("/donor") || path.equals("/donor-dashboard.html")) {
             if (!"DONOR".equals(role)) {
-                response.sendRedirect(request.getContextPath() + "/login?error=unauthorized");
-                return;
+                authorized = false;
             }
-        } else if (path.startsWith("/request/") || path.equals("/request")) {
+        } else if (path.startsWith("/request/") || path.equals("/request") || path.equals("/requester-dashboard.html") 
+                || path.equals("/request-form.html") || path.equals("/match-results.html") || path.equals("/match/find")) {
             if (!"REQUESTER".equals(role)) {
-                response.sendRedirect(request.getContextPath() + "/login?error=unauthorized");
-                return;
+                authorized = false;
             }
+        }
+
+        if (!authorized) {
+            if (isApiRequest(path)) {
+                response.setStatus(HttpServletResponse.SC_FORBIDDEN);
+                response.setContentType("application/json");
+                response.getWriter().write("{\"error\": \"Forbidden. Insufficient permissions.\"}");
+            } else {
+                response.sendRedirect(request.getContextPath() + "/login.html?error=unauthorized");
+            }
+            return;
         }
 
         // Authenticated + authorized — proceed
         chain.doFilter(request, response);
+    }
+
+    private boolean isApiRequest(String path) {
+        return path.equals("/donor/profile") 
+            || path.startsWith("/request/") 
+            || path.equals("/match/find") 
+            || path.startsWith("/admin/")
+            || path.equals("/login")
+            || path.equals("/register")
+            || path.equals("/logout");
     }
 
     private boolean isPublicUrl(String path) {

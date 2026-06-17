@@ -4,11 +4,11 @@ BloodConnect is a web application built to connect patients/hospitals needing ur
 
 ## Technology Stack
 
-- **Frontend**: JSP (JavaServer Pages), Tailwind CSS (via CDN), Vanilla JavaScript
-- **Backend**: Java Servlets 4.0.1 (Tomcat 9 compatible)
+- **Frontend**: Static HTML (Tailwind CSS via CDN, Vanilla JavaScript, Client-Side Rendered CSR Architecture)
+- **Backend**: Java Servlets 4.0.1 (Tomcat 9 compatible) with Gson (REST JSON APIs)
 - **Database**: MySQL, JDBC (Java Database Connectivity)
 - **Build & Dependency Tool**: Maven
-- **Security**: BCrypt password hashing, PreparedStatements (SQL injection protection), `<c:out>` tags (XSS protection)
+- **Security**: BCrypt password hashing, PreparedStatements (SQL injection protection), Client-side DOM Text Escaping (XSS protection)
 
 ---
 
@@ -21,6 +21,19 @@ BloodConnect is a web application built to connect patients/hospitals needing ur
 
 2. **Automated Matching Engine**:
    - Checks matching criteria: Same Blood Group, Same City (case-insensitive), Donor availability = `TRUE`, and a minimum 90-day cool-down gap since the last donation date.
+
+---
+
+## Migration Walkthrough — JSP to HTML+JS+API CSR Architecture
+
+BloodConnect has been refactored from legacy server-side JSP pages to a modern Client-Side Rendered (CSR) architecture.
+
+### Key Modifications:
+1. **REST JSON Endpoints**: Java Servlets communicate via UTF-8 JSON responses instead of JSP redirects and forwards. `Gson` handles model serialization.
+2. **Enhanced Security Filter**: `AuthFilter.java` intercepts requests. Protected HTML pages redirect to `/login.html` if unauthenticated, whereas protected API routes (e.g. `/donor/profile`, `/request/list`, etc.) return a standard `401 Unauthorized` / `403 Forbidden` JSON payload.
+3. **Client-Side Rendering (CSR)**: Standard `.html` files in `/src/main/webapp/` load on startup, verify the user's session status via GET `/login`, fetch the dashboard data asynchronously via the fetch API, and update the DOM dynamically.
+4. **Privacy Phone Masking**: Phone numbers of matching donors are server-side masked unless the administrator approves the request.
+5. **Clean Workspace**: Old `.jsp` templates have been completely removed.
 
 ---
 

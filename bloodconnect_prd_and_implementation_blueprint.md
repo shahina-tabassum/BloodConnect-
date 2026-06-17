@@ -17,7 +17,7 @@ This document contains the complete **Product Requirements Document (PRD)** and 
 ## 3. Technology Stack Requirements
 To maintain compatibility with standard enterprise containers and cloud builders (such as Railway, Heroku, or local Apache Tomcat), the stack must follow these specifications:
 - **Language**: Java 17
-- **Web Layer**: JSP (JavaServer Pages 2.3) + Java Servlets 4.0 (`javax.servlet` API)
+- **Web Layer**: Static HTML / Vanilla JS (Client-Side CSR) + Java Servlets 4.0 REST APIs (`javax.servlet` API)
 - **CSS Framework**: Tailwind CSS (Dark-themed glassmorphism styled custom design)
 - **Database**: MySQL 8.x
 - **Build System**: Maven (WAR packaging)
@@ -25,7 +25,7 @@ To maintain compatibility with standard enterprise containers and cloud builders
 - **Libraries**:
   - `mysql-connector-java` (JDBC Database Driver)
   - `jbcrypt` (BCrypt password hashing wrapper)
-  - `jstl` (JSP Standard Tag Library for security escaping and page rendering logic)
+  - `gson` (GSON JSON serialization library for model responses)
   - `javax.mail` (For potential email alerts integration)
 
 ---
@@ -33,12 +33,12 @@ To maintain compatibility with standard enterprise containers and cloud builders
 ## 4. Key Functional Features
 
 ### A. Authentication & Security
-- **Role-Based Routing**: A servlet filter (`AuthFilter`) protects routes by prefix:
-  - `/donor/*` → Accessible only by `DONOR` role
-  - `/request/*` → Accessible only by `REQUESTER` role
-  - `/admin/*` → Accessible only by `ADMIN` role
+- **Role-Based Routing**: A servlet filter (`AuthFilter`) protects routes by prefix and intercepts HTML page loads:
+  - If a user is unauthenticated:
+    - Accessing dynamic page dashboards (`donor-dashboard.html`, `requester-dashboard.html`, etc.) redirects to `/login.html`.
+    - Accessing backend API endpoints (e.g. `/donor/profile`, `/request/list`) returns a `401 Unauthorized` JSON payload.
 - **Password Security**: Passwords must be hashed using **BCrypt** (10 salt rounds) before database storage. Plaintext passwords must never be stored or directly compared in the DB.
-- **XSS Protection**: Every dynamic property outputted in JSPs must be escaped using JSTL `<c:out>` tags.
+- **XSS Protection**: Dynamic values must be rendered on the client side using safe DOM write operations (such as setting `.textContent` or creating safe text nodes) to eliminate Cross-Site Scripting (XSS) injection.
 
 ### B. Donor Profile Management
 - **Availability Toggle**: Donors can toggle their availability on/off.
@@ -135,30 +135,29 @@ Implement password utility, model classes, DAO layer, and the Servlet authentica
 > 1. `PasswordUtil.java`: A BCrypt wrapper using `org.mindrot.jbcrypt.BCrypt` to hash passwords (`hashPassword`) and verify passwords (`checkPassword`).
 > 2. `User.java` (Model class representing a user account).
 > 3. `UserDAO.java`: Standard JDBC queries to save/retrieve users. Implement `register(User)` returning generated ID, `findByEmail(String)`, `findById(int)`, and `getAllUsers()`.
-> 4. `LoginServlet.java`: Handles `/login` paths. Validates fields, uses `UserDAO.findByEmail` to fetch the user, checks the password via `PasswordUtil.checkPassword`, binds user details (`userId`, `role`, `userName`) to the session, and redirects by role (`DONOR` -> `/donor/profile`, `REQUESTER` -> `/request/list`, `ADMIN` -> `/admin/dashboard`).
-> 5. `RegisterServlet.java`: Handles `/register` paths. Performs server-side validations: required parameters, email uniqueness, passwords match, and inserts the user record (along with a blank donor profile if registering as a donor).
-> 6. `LogoutServlet.java`: Invalidates the HTTP session and redirects to `/`."
+> 4. `LoginServlet.java`: Handles `/login` paths. Validates fields, uses `UserDAO.findByEmail` to fetch the user, checks the password via `PasswordUtil.checkPassword`, binds user details (`userId`, `role`, `userName`) to the session, and writes a success JSON response containing the user role and name on POST, or session details on GET.
+> 5. `RegisterServlet.java`: Handles `/register` paths. Performs server-side validations: required parameters, email uniqueness, passwords match, and inserts the user record. Serves the list of Indian cities as JSON on GET.
+> 6. `LogoutServlet.java`: Invalidates the HTTP session and returns a JSON success payload."
 
 ### Prompt to generate `AuthFilter.java`:
-> "Create an `AuthFilter.java` mapping to `/*`. Exclude static resources (`/css/*`, `/js/*`) and pages `/login`, `/register`, and `/` (home page). Verify user is logged in. Perform role-based access checks based on request paths:
-> - Requests starting with `/admin/` require `ADMIN` role.
-> - Requests starting with `/donor/` require `DONOR` role.
-> - Requests starting with `/request/` require `REQUESTER` role.
+> "Create an `AuthFilter.java` mapping to `/*`. Exclude static resources (`/css/*`, `/js/*`) and pages `/login.html`, `/register.html`, and `/` (home page). Verify user is logged in. Perform role-based access checks based on request paths:
+> - Protected dashboard HTML views redirect to `/login.html`.
+> - Protected backend JSON API endpoints return standard `401 Unauthorized` or `403 Forbidden` response payloads.
 > Redirect unauthorized users to login with an appropriate error."
 
 ---
 
 ## Phase 4: UI & Dashboard Templates
-Implement front-end views using Tailwind CSS dark-mode glassmorphism aesthetics. All outputted database variables must use `<c:out>`.
+Implement front-end static views in HTML/JS using Tailwind CSS dark-mode glassmorphism aesthetics. All dynamic data must be fetched using JavaScript `fetch()` API and written to DOM elements safely.
 
-### Prompt to generate Landing Page (`index.jsp`):
-> "Create a landing page `index.jsp` for 'BloodConnect' configured with dynamic Tailwind CSS dark-theme and glassmorphism cards. Include sections showing the app features, call-to-action buttons for registration/login, and a footer."
+### Prompt to generate Landing Page (`index.html`):
+> "Create a landing page `index.html` for 'BloodConnect' configured with dynamic Tailwind CSS dark-theme and glassmorphism cards. Fetch login status on load from `/login` to update navigation header and CTAs dynamically."
 
-### Prompt to generate Auth Pages (`login.jsp` & `register.jsp`):
-> "Generate `login.jsp` and `register.jsp` with dark aesthetics, glassmorphism cards, and a logo. 
-> 1. Both pages must include a styled 'Back to Home' navigation button pointing to the index page (`/`) using a left-pointing arrow icon.
-> 2. In `register.jsp`, display a role selector (Donor / Requester). If 'Donor' is selected, dynamically toggle visible fields for age, gender, blood group (dropdown), and city (dropdown from `CityList`).
-> 3. In `login.jsp`, handle display of error/success attributes using `<c:out>` and JSTL `<c:if>`."
+### Prompt to generate Auth Pages (`login.html` & `register.html`):
+> "Generate `login.html` and `register.html` with dark aesthetics, glassmorphism cards, and a logo. 
+> 1. Both pages must include a styled 'Back to Home' navigation button pointing to the index page (`index.html`) using a left-pointing arrow icon.
+> 2. In `register.html`, display a role selector (Donor / Requester). If 'Donor' is selected, dynamically toggle visible fields for age, gender, blood group (dropdown), and city (dropdown populated via GET `/register`).
+> 3. In both pages, intercept form submission, submit via `fetch` API, and handle errors dynamically."
 
 ---
 
@@ -167,12 +166,12 @@ Build the donor/requester features, the matching logic, and the admin control pa
 
 ### Prompt to generate Matching and Admin Servlets:
 > "Implement:
-> 1. `DonorDAO.java` and `DonorProfileServlet.java`: Retrieves and updates the donor profile (pincode, age, gender, blood group, city dropdown, availability boolean, and `last_donation_date`).
-> 2. `RequestDAO.java` and `RequestServlet.java`: Allows a requester to post a new request (patient name, blood group, units, hospital, city, urgency) and query matches.
+> 1. `DonorDAO.java` and `DonorProfileServlet.java`: Retrieves and updates the donor profile as JSON. Handles toggling availability and match status via POST.
+> 2. `RequestDAO.java` and `RequestServlet.java`: Allows a requester to post a new request and returns matches counts in JSON.
 > 3. `MatchDAO.java` and `MatchServlet.java`: Implement the database matching query:
 >    `SELECT ... FROM donor_profiles d JOIN users u ON d.donor_id = u.user_id WHERE d.blood_group = ? AND LOWER(d.city) = LOWER(?) AND d.is_available = TRUE AND (d.last_donation_date IS NULL OR DATEDIFF(CURDATE(), d.last_donation_date) >= 90)`
-> 4. If a match is queried by a requester, mask the contact numbers in the JSP unless the request's `is_verified` flag is true.
-> 5. `AdminDashboardServlet.java` & `AdminVerifyServlet.java` with `admin-dashboard.jsp`: Aggregates active stats, shows a queue of requests awaiting verification, queries all matching donors and their status (`ACCEPTED`, `DECLINED`, `PENDING`) for each request, renders this match list inside each request card (using green for accepted, red for declined, grey for pending), and allows the admin to approve verification (setting `is_verified` to true) and change the request status."
+> 4. If a match is queried by a requester, mask the contact numbers in the JSON response server-side unless the request's `is_verified` flag is true.
+> 5. `AdminDashboardServlet.java` & `AdminVerifyServlet.java` returning JSON data, and building the `admin-dashboard.html` panel: Aggregates active stats, shows a queue of requests awaiting verification, queries all matching donors and their status (`ACCEPTED`, `DECLINED`, `PENDING`) for each request, renders this match list inside each request card (using green for accepted, red for declined, grey for pending), and allows the admin to approve verification and change the request status via POST API calls."
 
 ---
 
@@ -191,8 +190,8 @@ Setup Docker container structures to allow deployment to containers (e.g. Railwa
 If you feed these rules to your assistant, you will get the exact copy:
 
 - [ ] **Aesthetic Rule**: "Use dark mode, vibrant red highlights (e.g., `#ef4444` to `#dc2626`), and Tailwind CSS glassmorphic cards (`background: rgba(255, 255, 255, 0.05); backdrop-filter: blur(20px)`)."
-- [ ] **Redirection Rule**: "Make sure `/logout` redirects to `/` (welcome page), and accessing protected directories without credentials redirects to `/login`."
-- [ ] **Privacy Rule**: "Mask phone numbers as `XXXXXX` on the matching results page if the request is not admin-verified."
-- [ ] **Dropdown Rule**: "Cities must be generated using `<c:forEach>` over a Java array constant (`CityList.CITIES`) to prevent mismatch typos during matching queries."
+- [ ] **Redirection Rule**: "Make sure the `/logout` API is called and invalidates the session, returning a JSON success message which redirects the client. Protected dynamic directories and pages must redirect unauthenticated clients to `login.html`."
+- [ ] **Privacy Rule**: "Mask phone numbers server-side as `XX******XX` before writing matching donor JSON responses if the request is not verified."
+- [ ] **Dropdown Rule**: "Populate city selectors dynamically by calling the registration or request creation GET API endpoints."
 - [ ] **Viewport Rule**: "Use `overflow-y-auto` instead of `overflow-hidden` on auth views to prevent login boxes from clipping on smaller screen dimensions."
 - [ ] **Matched Donor Status Rule**: "Ensure the admin dashboard displays a status section for matched donors (green badge for Accepted Match, red badge for Declined Match, grey badge for Pending Response) directly inside each blood request card in the control queue."

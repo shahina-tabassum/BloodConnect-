@@ -1,5 +1,3 @@
-<%@ page contentType="text/html;charset=UTF-8" language="java" %>
-<%@ taglib prefix="c" uri="http://java.sun.com/jsp/jstl/core" %>
 <!DOCTYPE html>
 <html lang="en">
 <head>
@@ -55,15 +53,9 @@
                 <span class="text-[10px] text-blood-400 font-semibold uppercase tracking-wider block leading-none">Saving Lives</span>
             </div>
         </div>
-        <div class="flex items-center gap-4">
-            <a href="${pageContext.request.contextPath}/login" id="login-nav-btn"
-               class="text-xs font-semibold text-gray-300 hover:text-white transition-colors">
-                Sign In
-            </a>
-            <a href="${pageContext.request.contextPath}/register" id="register-nav-btn"
-               class="px-4 py-2 bg-gradient-to-r from-blood-600 to-blood-700 hover:from-blood-500 hover:to-blood-600 rounded-xl text-xs font-semibold tracking-wide transition-all duration-200">
-                Register Now
-            </a>
+        <div class="flex items-center gap-4" id="nav-actions">
+            <!-- Loading state -->
+            <span class="text-xs text-gray-500">Loading...</span>
         </div>
     </nav>
 
@@ -83,12 +75,12 @@
                 BloodConnect automates the matching process between patient requests and eligible donors. Our secure administrative verification layer ensures donor privacy until urgent cases are validated.
             </p>
 
-            <div class="flex flex-col sm:flex-row items-stretch sm:items-center gap-4 pt-4">
-                <a href="${pageContext.request.contextPath}/register" id="cta-donor"
+            <div class="flex flex-col sm:flex-row items-stretch sm:items-center gap-4 pt-4" id="cta-container">
+                <a href="register.html" id="cta-donor"
                    class="px-6 py-3 bg-gradient-to-r from-blood-600 to-blood-700 hover:from-blood-500 hover:to-blood-600 text-center text-white font-semibold rounded-xl shadow-lg shadow-blood-600/30 hover:shadow-blood-500/40 transition-all duration-300 transform hover:scale-[1.02] active:scale-[0.98] text-sm">
                     Register as Donor
                 </a>
-                <a href="${pageContext.request.contextPath}/register?role=REQUESTER" id="cta-requester"
+                <a href="register.html?role=REQUESTER" id="cta-requester"
                    class="px-6 py-3 bg-white/5 border border-white/10 hover:bg-white/10 text-center text-gray-200 font-semibold rounded-xl text-sm transition-all duration-200">
                     Request Blood Supply
                 </a>
@@ -136,8 +128,62 @@
     <!-- Footer -->
     <footer class="relative z-10 glass border-t border-white/5 py-8 text-center text-gray-500 text-xs">
         <p>&copy; 2026 BloodConnect. All rights reserved.</p>
-        <p class="mt-1 text-gray-600">Built securely using Java Servlets, JDBC, and JSP.</p>
+        <p class="mt-1 text-gray-600">Built securely using Java Servlets, JDBC, and REST APIs.</p>
     </footer>
 
+    <script>
+        document.addEventListener('DOMContentLoaded', () => {
+            fetch('login')
+                .then(res => res.json())
+                .then(data => {
+                    const navActions = document.getElementById('nav-actions');
+                    const ctaContainer = document.getElementById('cta-container');
+
+                    if (data.success) {
+                        let dashboardUrl = 'login.html';
+                        if (data.role === 'ADMIN') dashboardUrl = 'admin-dashboard.html';
+                        else if (data.role === 'DONOR') dashboardUrl = 'donor-dashboard.html';
+                        else if (data.role === 'REQUESTER') dashboardUrl = 'requester-dashboard.html';
+
+                        // Update navbar
+                        navActions.innerHTML = `
+                            <span class="text-xs text-gray-400 mr-2">Welcome, <strong class="text-white">${data.userName}</strong></span>
+                            <a href="${dashboardUrl}" class="text-xs font-semibold text-gray-300 hover:text-white transition-colors mr-2">Dashboard</a>
+                            <button id="logout-btn" class="px-4 py-2 bg-white/5 border border-white/10 hover:bg-white/10 rounded-xl text-xs font-semibold tracking-wide transition-all duration-200">Sign Out</button>
+                        `;
+
+                        // Add signout handler
+                        document.getElementById('logout-btn').addEventListener('click', () => {
+                            fetch('logout', { method: 'POST' })
+                                .then(res => res.json())
+                                .then(() => {
+                                    window.location.reload();
+                                });
+                        });
+
+                        // Update CTAs to redirect directly to dashboard
+                        ctaContainer.innerHTML = `
+                            <a href="${dashboardUrl}" class="px-6 py-3 bg-gradient-to-r from-blood-600 to-blood-700 hover:from-blood-500 hover:to-blood-600 text-center text-white font-semibold rounded-xl shadow-lg shadow-blood-600/30 hover:shadow-blood-500/40 transition-all duration-300 transform hover:scale-[1.02] active:scale-[0.98] text-sm">
+                                Go to Dashboard
+                            </a>
+                        `;
+                    } else {
+                        // Not logged in
+                        navActions.innerHTML = `
+                            <a href="login.html" id="login-nav-btn" class="text-xs font-semibold text-gray-300 hover:text-white transition-colors">Sign In</a>
+                            <a href="register.html" id="register-nav-btn" class="px-4 py-2 bg-gradient-to-r from-blood-600 to-blood-700 hover:from-blood-500 hover:to-blood-600 rounded-xl text-xs font-semibold tracking-wide transition-all duration-200">Register Now</a>
+                        `;
+                    }
+                })
+                .catch(err => {
+                    console.error('Error checking session status:', err);
+                    const navActions = document.getElementById('nav-actions');
+                    navActions.innerHTML = `
+                        <a href="login.html" id="login-nav-btn" class="text-xs font-semibold text-gray-300 hover:text-white transition-colors">Sign In</a>
+                        <a href="register.html" id="register-nav-btn" class="px-4 py-2 bg-gradient-to-r from-blood-600 to-blood-700 hover:from-blood-500 hover:to-blood-600 rounded-xl text-xs font-semibold tracking-wide transition-all duration-200">Register Now</a>
+                    `;
+                });
+        });
+    </script>
 </body>
 </html>

@@ -1,5 +1,3 @@
-<%@ page contentType="text/html;charset=UTF-8" language="java" %>
-<%@ taglib prefix="c" uri="http://java.sun.com/jsp/jstl/core" %>
 <!DOCTYPE html>
 <html lang="en">
 <head>
@@ -46,7 +44,7 @@
     <div class="relative z-10 w-full max-w-lg">
         
         <!-- Back Button -->
-        <a href="${pageContext.request.contextPath}/request/list" id="back-dashboard-btn"
+        <a href="requester-dashboard.html" id="back-dashboard-btn"
            class="inline-flex items-center gap-2 text-xs font-semibold text-gray-400 hover:text-white mb-6 transition-colors group">
             <span class="transform group-hover:-translate-x-1 transition-transform">←</span> Back to Dashboard
         </a>
@@ -65,20 +63,15 @@
         <!-- Form Card -->
         <div class="glass rounded-2xl p-8 shadow-2xl">
 
-            <!-- Error message -->
-            <c:if test="${not empty error}">
-                <div class="bg-red-500/10 border border-red-500/30 text-red-300 px-4 py-3 rounded-xl mb-5 text-sm" id="error-alert">
-                    <c:out value="${error}"/>
-                </div>
-            </c:if>
+            <!-- Alert messages container -->
+            <div id="alert-container"></div>
 
-            <form action="${pageContext.request.contextPath}/request/new" method="POST" class="space-y-5" id="request-form">
+            <form class="space-y-5" id="request-form">
 
                 <!-- Patient Name -->
                 <div>
                     <label for="patientName" class="block text-xs font-semibold text-gray-400 uppercase tracking-wider mb-2">Patient Name</label>
                     <input type="text" id="patientName" name="patientName"
-                           value="<c:out value='${formPatientName}'/>"
                            placeholder="Patient Full Name" required
                            class="w-full px-4 py-3 bg-white/5 border border-white/10 rounded-xl text-white placeholder-gray-600 focus:outline-none input-glow transition-all duration-200">
                 </div>
@@ -90,14 +83,14 @@
                         <select id="bloodGroupNeeded" name="bloodGroupNeeded" required
                                 class="w-full px-4 py-3 bg-white/5 border border-white/10 rounded-xl text-white focus:outline-none input-glow transition-all duration-200 appearance-none">
                             <option value="" class="bg-gray-900">Select</option>
-                            <option value="A+" class="bg-gray-900" <c:if test="${formBloodGroup == 'A+'}">selected</c:if>>A+</option>
-                            <option value="A-" class="bg-gray-900" <c:if test="${formBloodGroup == 'A-'}">selected</c:if>>A-</option>
-                            <option value="B+" class="bg-gray-900" <c:if test="${formBloodGroup == 'B+'}">selected</c:if>>B+</option>
-                            <option value="B-" class="bg-gray-900" <c:if test="${formBloodGroup == 'B-'}">selected</c:if>>B-</option>
-                            <option value="AB+" class="bg-gray-900" <c:if test="${formBloodGroup == 'AB+'}">selected</c:if>>AB+</option>
-                            <option value="AB-" class="bg-gray-900" <c:if test="${formBloodGroup == 'AB-'}">selected</c:if>>AB-</option>
-                            <option value="O+" class="bg-gray-900" <c:if test="${formBloodGroup == 'O+'}">selected</c:if>>O+</option>
-                            <option value="O-" class="bg-gray-900" <c:if test="${formBloodGroup == 'O-'}">selected</c:if>>O-</option>
+                            <option value="A+" class="bg-gray-900">A+</option>
+                            <option value="A-" class="bg-gray-900">A-</option>
+                            <option value="B+" class="bg-gray-900">B+</option>
+                            <option value="B-" class="bg-gray-900">B-</option>
+                            <option value="AB+" class="bg-gray-900">AB+</option>
+                            <option value="AB-" class="bg-gray-900">AB-</option>
+                            <option value="O+" class="bg-gray-900">O+</option>
+                            <option value="O-" class="bg-gray-900">O-</option>
                         </select>
                     </div>
 
@@ -105,8 +98,7 @@
                     <div>
                         <label for="unitsRequired" class="block text-xs font-semibold text-gray-400 uppercase tracking-wider mb-2">Units Required</label>
                         <input type="number" id="unitsRequired" name="unitsRequired"
-                               value="<c:out value='${formUnits != null ? formUnits : 1}'/>"
-                               min="1" placeholder="e.g. 2" required
+                               value="1" min="1" placeholder="e.g. 2" required
                                class="w-full px-4 py-3 bg-white/5 border border-white/10 rounded-xl text-white placeholder-gray-600 focus:outline-none input-glow transition-all duration-200">
                     </div>
                 </div>
@@ -115,7 +107,6 @@
                 <div>
                     <label for="hospitalName" class="block text-xs font-semibold text-gray-400 uppercase tracking-wider mb-2">Hospital Name & Branch</label>
                     <input type="text" id="hospitalName" name="hospitalName"
-                           value="<c:out value='${formHospitalName}'/>"
                            placeholder="e.g. Apollo Hospital, Jubilee Hills" required
                            class="w-full px-4 py-3 bg-white/5 border border-white/10 rounded-xl text-white placeholder-gray-600 focus:outline-none input-glow transition-all duration-200">
                 </div>
@@ -127,10 +118,6 @@
                         <select id="city" name="city" required
                                 class="w-full px-4 py-3 bg-white/5 border border-white/10 rounded-xl text-white focus:outline-none input-glow transition-all duration-200 appearance-none">
                             <option value="" class="bg-gray-900">Select City</option>
-                            <c:forEach var="c" items="${cities}">
-                                <option value="${c}" class="bg-gray-900"
-                                        <c:if test="${formCity == c}">selected</c:if>><c:out value="${c}"/></option>
-                            </c:forEach>
                         </select>
                     </div>
 
@@ -139,10 +126,10 @@
                         <label for="urgency" class="block text-xs font-semibold text-gray-400 uppercase tracking-wider mb-2">Urgency Level</label>
                         <select id="urgency" name="urgency" required
                                 class="w-full px-4 py-3 bg-white/5 border border-white/10 rounded-xl text-white focus:outline-none input-glow transition-all duration-200 appearance-none">
-                            <option value="LOW" class="bg-gray-950" <c:if test="${formUrgency == 'LOW'}">selected</c:if>>Low</option>
-                            <option value="MEDIUM" class="bg-gray-950" <c:if test="${formUrgency == 'MEDIUM' || empty formUrgency}">selected</c:if>>Medium</option>
-                            <option value="HIGH" class="bg-gray-950" <c:if test="${formUrgency == 'HIGH'}">selected</c:if>>High</option>
-                            <option value="CRITICAL" class="bg-gray-950" <c:if test="${formUrgency == 'CRITICAL'}">selected</c:if>>Critical 🚨</option>
+                            <option value="LOW" class="bg-gray-950">Low</option>
+                            <option value="MEDIUM" class="bg-gray-950" selected>Medium</option>
+                            <option value="HIGH" class="bg-gray-950">High</option>
+                            <option value="CRITICAL" class="bg-gray-950">Critical 🚨</option>
                         </select>
                     </div>
                 </div>
@@ -161,17 +148,97 @@
         </p>
     </div>
 
-    <!-- Client-side Validation -->
     <script>
-        const form = document.getElementById('request-form');
-        const unitsInput = document.getElementById('unitsRequired');
+        document.addEventListener('DOMContentLoaded', () => {
+            const form = document.getElementById('request-form');
+            const citySelect = document.getElementById('city');
+            const alertContainer = document.getElementById('alert-container');
+            const unitsInput = document.getElementById('unitsRequired');
 
-        form.addEventListener('submit', function(e) {
-            const units = parseInt(unitsInput.value, 10);
-            if (isNaN(units) || units <= 0) {
+            // Verify session
+            fetch('login')
+                .then(res => res.json())
+                .then(sessionData => {
+                    if (!sessionData.success || sessionData.role !== 'REQUESTER') {
+                        window.location.href = 'login.html';
+                    }
+                })
+                .catch(err => {
+                    console.error('Session verify error:', err);
+                    window.location.href = 'login.html';
+                });
+
+            // Fetch cities list dynamically
+            fetch('request/new')
+                .then(res => res.json())
+                .then(cities => {
+                    cities.forEach(c => {
+                        const opt = document.createElement('option');
+                        opt.value = c;
+                        opt.textContent = c;
+                        opt.className = 'bg-gray-900';
+                        citySelect.appendChild(opt);
+                    });
+                })
+                .catch(err => console.error('Error fetching cities:', err));
+
+            // Submit Form
+            form.addEventListener('submit', (e) => {
                 e.preventDefault();
-                alert('Please enter a valid positive number of blood units.');
-            }
+
+                const patientName = document.getElementById('patientName').value;
+                const bloodGroupNeeded = document.getElementById('bloodGroupNeeded').value;
+                const unitsRequired = parseInt(unitsInput.value, 10);
+                const hospitalName = document.getElementById('hospitalName').value;
+                const city = citySelect.value;
+                const urgency = document.getElementById('urgency').value;
+
+                if (isNaN(unitsRequired) || unitsRequired <= 0) {
+                    alertContainer.innerHTML = `
+                        <div class="bg-red-500/10 border border-red-500/30 text-red-300 px-4 py-3 rounded-xl mb-5 text-sm" id="error-alert">
+                            Please enter a valid positive number of blood units.
+                        </div>
+                    `;
+                    return;
+                }
+
+                const params = new URLSearchParams();
+                params.append('patientName', patientName);
+                params.append('bloodGroupNeeded', bloodGroupNeeded);
+                params.append('unitsRequired', unitsRequired);
+                params.append('hospitalName', hospitalName);
+                params.append('city', city);
+                params.append('urgency', urgency);
+
+                fetch('request/new', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
+                    body: params
+                })
+                .then(res => {
+                    return res.json().then(data => {
+                        if (res.ok && data.success) {
+                            alertContainer.innerHTML = `
+                                <div class="bg-emerald-500/10 border border-emerald-500/30 text-emerald-300 px-4 py-3 rounded-xl mb-5 text-sm" id="success-alert">
+                                    Request posted successfully! Found ${data.matchCount} compatible donor(s). Redirecting...
+                                </div>
+                            `;
+                            setTimeout(() => {
+                                window.location.href = 'requester-dashboard.html';
+                            }, 1500);
+                        } else {
+                            throw new Error(data.message || 'Failed to submit request.');
+                        }
+                    });
+                })
+                .catch(err => {
+                    alertContainer.innerHTML = `
+                        <div class="bg-red-500/10 border border-red-500/30 text-red-300 px-4 py-3 rounded-xl mb-5 text-sm" id="error-alert">
+                            ${err.message}
+                        </div>
+                    `;
+                });
+            });
         });
     </script>
 </body>

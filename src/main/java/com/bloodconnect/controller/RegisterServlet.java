@@ -6,6 +6,7 @@ import com.bloodconnect.model.DonorProfile;
 import com.bloodconnect.model.User;
 import com.bloodconnect.util.CityList;
 import com.bloodconnect.util.PasswordUtil;
+import com.google.gson.Gson;
 
 import javax.servlet.ServletException;
 import javax.servlet.annotation.WebServlet;
@@ -14,31 +15,37 @@ import javax.servlet.http.HttpServletRequest;
 import javax.servlet.http.HttpServletResponse;
 import java.io.IOException;
 import java.sql.SQLException;
+import java.util.HashMap;
+import java.util.Map;
 
 /**
  * Handles user registration.
- * GET  /register → shows registration form
- * POST /register → validates input, creates user (+ donor profile if DONOR), redirects to login
+ * GET  /register → returns Indian cities dropdown list in JSON
+ * POST /register → validates input, creates user (+ donor profile if DONOR), returns JSON status
  */
 @WebServlet("/register")
 public class RegisterServlet extends HttpServlet {
 
     private final UserDAO userDAO = new UserDAO();
     private final DonorDAO donorDAO = new DonorDAO();
+    private final Gson gson = new Gson();
 
     @Override
     protected void doGet(HttpServletRequest request, HttpServletResponse response)
             throws ServletException, IOException {
-        // Pass city list to JSP for dropdown
-        request.setAttribute("cities", CityList.CITIES);
-        request.getRequestDispatcher("/register.jsp").forward(request, response);
+        response.setContentType("application/json");
+        response.setCharacterEncoding("UTF-8");
+        response.getWriter().write(gson.toJson(CityList.CITIES));
     }
 
     @Override
     protected void doPost(HttpServletRequest request, HttpServletResponse response)
             throws ServletException, IOException {
 
-        // Collect form fields
+        response.setContentType("application/json");
+        response.setCharacterEncoding("UTF-8");
+
+        // Collect fields
         String fullName = trim(request.getParameter("fullName"));
         String email = trim(request.getParameter("email"));
         String phone = trim(request.getParameter("phone"));
@@ -49,6 +56,8 @@ public class RegisterServlet extends HttpServlet {
         // Donor-specific fields
         String bloodGroup = trim(request.getParameter("bloodGroup"));
         String city = trim(request.getParameter("city"));
+
+        Map<String, Object> result = new HashMap<>();
 
         // --- Server-side validation ---
         StringBuilder errors = new StringBuilder();
@@ -65,7 +74,6 @@ public class RegisterServlet extends HttpServlet {
         if (password == null || password.length() < 8) {
             errors.append("Password must be at least 8 characters. ");
         }
-        // Server-side confirmPassword check — don't rely on JS alone
         if (password != null && !password.equals(confirmPassword)) {
             errors.append("Passwords do not match. ");
         }
@@ -81,33 +89,21 @@ public class RegisterServlet extends HttpServlet {
             }
         }
 
-        // Check for validation errors
         if (errors.length() > 0) {
-            request.setAttribute("error", errors.toString().trim());
-            request.setAttribute("cities", CityList.CITIES);
-            // Preserve form values
-            request.setAttribute("formName", fullName);
-            request.setAttribute("formEmail", email);
-            request.setAttribute("formPhone", phone);
-            request.setAttribute("formRole", role);
-            request.setAttribute("formBloodGroup", bloodGroup);
-            request.setAttribute("formCity", city);
-            request.getRequestDispatcher("/register.jsp").forward(request, response);
+            response.setStatus(HttpServletResponse.SC_BAD_REQUEST);
+            result.put("success", false);
+            result.put("message", errors.toString().trim());
+            response.getWriter().write(gson.toJson(result));
             return;
         }
 
         try {
             // Check email uniqueness
             if (userDAO.findByEmail(email) != null) {
-                request.setAttribute("error", "An account with this email already exists.");
-                request.setAttribute("cities", CityList.CITIES);
-                request.setAttribute("formName", fullName);
-                request.setAttribute("formEmail", email);
-                request.setAttribute("formPhone", phone);
-                request.setAttribute("formRole", role);
-                request.setAttribute("formBloodGroup", bloodGroup);
-                request.setAttribute("formCity", city);
-                request.getRequestDispatcher("/register.jsp").forward(request, response);
+                response.setStatus(HttpServletResponse.SC_CONFLICT);
+                result.put("success", false);
+                result.put("message", "An account with this email already exists.");
+                response.getWriter().write(gson.toJson(result));
                 return;
             }
 
@@ -132,14 +128,17 @@ public class RegisterServlet extends HttpServlet {
                 donorDAO.createProfile(dp);
             }
 
-            // Success — redirect to login with success message
-            response.sendRedirect(request.getContextPath() + "/login?registered=true");
+            response.setStatus(HttpServletResponse.SC_CREATED);
+            result.put("success", true);
+            result.put("message", "Registration successful!");
+            response.getWriter().write(gson.toJson(result));
 
         } catch (SQLException e) {
             e.printStackTrace();
-            request.setAttribute("error", "Registration failed. Please try again.");
-            request.setAttribute("cities", CityList.CITIES);
-            request.getRequestDispatcher("/register.jsp").forward(request, response);
+            response.setStatus(HttpServletResponse.SC_INTERNAL_SERVER_ERROR);
+            result.put("success", false);
+            result.put("message", "Registration failed due to a database error.");
+            response.getWriter().write(gson.toJson(result));
         }
     }
 

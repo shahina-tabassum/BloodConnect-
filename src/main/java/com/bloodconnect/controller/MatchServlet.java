@@ -4,6 +4,7 @@ import com.bloodconnect.dao.MatchDAO;
 import com.bloodconnect.dao.RequestDAO;
 import com.bloodconnect.model.BloodRequest;
 import com.bloodconnect.model.DonorMatch;
+import com.google.gson.Gson;
 
 import javax.servlet.ServletException;
 import javax.servlet.annotation.WebServlet;
@@ -13,25 +14,32 @@ import javax.servlet.http.HttpServletResponse;
 import javax.servlet.http.HttpSession;
 import java.io.IOException;
 import java.sql.SQLException;
+import java.util.HashMap;
 import java.util.List;
+import java.util.Map;
 
 /**
  * Handles retrieving matching donors for a blood request.
- * GET /match/find?requestId=X → lists matches, masking phone numbers if request is not admin-verified.
+ * GET /match/find?requestId=X → lists matches, masking phone numbers if request is not admin-verified, returns JSON
  */
 @WebServlet("/match/find")
 public class MatchServlet extends HttpServlet {
 
     private final RequestDAO requestDAO = new RequestDAO();
     private final MatchDAO matchDAO = new MatchDAO();
+    private final Gson gson = new Gson();
 
     @Override
     protected void doGet(HttpServletRequest request, HttpServletResponse response)
             throws ServletException, IOException {
 
+        response.setContentType("application/json");
+        response.setCharacterEncoding("UTF-8");
+
         HttpSession session = request.getSession(false);
         if (session == null || session.getAttribute("userId") == null) {
-            response.sendRedirect(request.getContextPath() + "/login");
+            response.setStatus(HttpServletResponse.SC_UNAUTHORIZED);
+            response.getWriter().write("{\"error\": \"Unauthorized\"}");
             return;
         }
 
@@ -39,8 +47,13 @@ public class MatchServlet extends HttpServlet {
         String role = (String) session.getAttribute("role");
 
         String requestIdStr = request.getParameter("requestId");
+        Map<String, Object> result = new HashMap<>();
+
         if (requestIdStr == null || requestIdStr.isEmpty()) {
-            response.sendRedirect(request.getContextPath() + "/request/list");
+            response.setStatus(HttpServletResponse.SC_BAD_REQUEST);
+            result.put("success", false);
+            result.put("message", "Request ID is required.");
+            response.getWriter().write(gson.toJson(result));
             return;
         }
 
@@ -49,14 +62,19 @@ public class MatchServlet extends HttpServlet {
             BloodRequest bloodRequest = requestDAO.getRequestById(requestId);
 
             if (bloodRequest == null) {
-                session.setAttribute("errorMsg", "Blood request not found.");
-                response.sendRedirect(request.getContextPath() + "/request/list");
+                response.setStatus(HttpServletResponse.SC_NOT_FOUND);
+                result.put("success", false);
+                result.put("message", "Blood request not found.");
+                response.getWriter().write(gson.toJson(result));
                 return;
             }
 
             // Enforce authorization: Only the requester who posted it or an ADMIN can view the matches
             if (!"ADMIN".equals(role) && bloodRequest.getRequesterId() != userId) {
-                response.sendRedirect(request.getContextPath() + "/login?error=unauthorized");
+                response.setStatus(HttpServletResponse.SC_FORBIDDEN);
+                result.put("success", false);
+                result.put("message", "Forbidden. You are not authorized to view these matches.");
+                response.getWriter().write(gson.toJson(result));
                 return;
             }
 
@@ -75,17 +93,23 @@ public class MatchServlet extends HttpServlet {
                 }
             }
 
-            request.setAttribute("bloodRequest", bloodRequest);
-            request.setAttribute("matches", matches);
+            result.put("success", true);
+            result.put("bloodRequest", bloodRequest);
+            result.put("matches", matches);
 
-            request.getRequestDispatcher("/match-results.jsp").forward(request, response);
+            response.getWriter().write(gson.toJson(result));
 
         } catch (NumberFormatException e) {
-            session.setAttribute("errorMsg", "Invalid request ID format.");
-            response.sendRedirect(request.getContextPath() + "/request/list");
+            response.setStatus(HttpServletResponse.SC_BAD_REQUEST);
+            result.put("success", false);
+            result.put("message", "Invalid request ID format.");
+            response.getWriter().write(gson.toJson(result));
         } catch (SQLException e) {
             e.printStackTrace();
-            response.sendRedirect(request.getContextPath() + "/error.jsp");
+            response.setStatus(HttpServletResponse.SC_INTERNAL_SERVER_ERROR);
+            result.put("success", false);
+            result.put("message", "Database error occurred while loading matches.");
+            response.getWriter().write(gson.toJson(result));
         }
     }
 }

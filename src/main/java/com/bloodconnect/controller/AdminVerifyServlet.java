@@ -1,6 +1,7 @@
 package com.bloodconnect.controller;
 
 import com.bloodconnect.dao.RequestDAO;
+import com.google.gson.Gson;
 
 import javax.servlet.ServletException;
 import javax.servlet.annotation.WebServlet;
@@ -10,6 +11,8 @@ import javax.servlet.http.HttpServletResponse;
 import javax.servlet.http.HttpSession;
 import java.io.IOException;
 import java.sql.SQLException;
+import java.util.HashMap;
+import java.util.Map;
 
 /**
  * Handles admin actions on blood requests.
@@ -19,14 +22,23 @@ import java.sql.SQLException;
 public class AdminVerifyServlet extends HttpServlet {
 
     private final RequestDAO requestDAO = new RequestDAO();
+    private final Gson gson = new Gson();
 
     @Override
     protected void doPost(HttpServletRequest request, HttpServletResponse response)
             throws ServletException, IOException {
 
+        response.setContentType("application/json");
+        response.setCharacterEncoding("UTF-8");
+
         HttpSession session = request.getSession(false);
+        Map<String, Object> result = new HashMap<>();
+
         if (session == null || session.getAttribute("userId") == null) {
-            response.sendRedirect(request.getContextPath() + "/login");
+            response.setStatus(HttpServletResponse.SC_UNAUTHORIZED);
+            result.put("success", false);
+            result.put("message", "Unauthorized. Please log in.");
+            response.getWriter().write(gson.toJson(result));
             return;
         }
 
@@ -34,7 +46,10 @@ public class AdminVerifyServlet extends HttpServlet {
         int adminId = (int) session.getAttribute("userId");
 
         if (!"ADMIN".equals(role)) {
-            response.sendRedirect(request.getContextPath() + "/login?error=unauthorized");
+            response.setStatus(HttpServletResponse.SC_FORBIDDEN);
+            result.put("success", false);
+            result.put("message", "Forbidden. Insufficient permissions.");
+            response.getWriter().write(gson.toJson(result));
             return;
         }
 
@@ -42,8 +57,10 @@ public class AdminVerifyServlet extends HttpServlet {
         String requestIdStr = request.getParameter("requestId");
 
         if (requestIdStr == null || requestIdStr.isEmpty()) {
-            session.setAttribute("errorMsg", "Missing request ID.");
-            response.sendRedirect(request.getContextPath() + "/admin/dashboard");
+            response.setStatus(HttpServletResponse.SC_BAD_REQUEST);
+            result.put("success", false);
+            result.put("message", "Missing request ID.");
+            response.getWriter().write(gson.toJson(result));
             return;
         }
 
@@ -52,27 +69,37 @@ public class AdminVerifyServlet extends HttpServlet {
 
             if ("verify".equals(action)) {
                 requestDAO.verifyRequest(requestId, adminId);
-                // Also update status to MATCHED if matches exist, or keep OPEN
-                session.setAttribute("successMsg", "Blood request verified successfully. Contact details are now public for matching donors.");
+                result.put("success", true);
+                result.put("message", "Blood request verified successfully. Contact details are now public for matching donors.");
             } else if ("updateStatus".equals(action)) {
                 String status = request.getParameter("status");
                 if ("OPEN".equals(status) || "MATCHED".equals(status) || "FULFILLED".equals(status) || "CLOSED".equals(status)) {
                     requestDAO.updateStatus(requestId, status);
-                    session.setAttribute("successMsg", "Blood request status updated to " + status + ".");
+                    result.put("success", true);
+                    result.put("message", "Blood request status updated to " + status + ".");
                 } else {
-                    session.setAttribute("errorMsg", "Invalid status value.");
+                    response.setStatus(HttpServletResponse.SC_BAD_REQUEST);
+                    result.put("success", false);
+                    result.put("message", "Invalid status value.");
                 }
             } else {
-                session.setAttribute("errorMsg", "Invalid action.");
+                response.setStatus(HttpServletResponse.SC_BAD_REQUEST);
+                result.put("success", false);
+                result.put("message", "Invalid action.");
             }
 
         } catch (NumberFormatException e) {
-            session.setAttribute("errorMsg", "Invalid request ID format.");
+            response.setStatus(HttpServletResponse.SC_BAD_REQUEST);
+            result.put("success", false);
+            result.put("message", "Invalid request ID format.");
         } catch (SQLException e) {
             e.printStackTrace();
-            session.setAttribute("errorMsg", "Database error occurred during operation.");
+            response.setStatus(HttpServletResponse.SC_INTERNAL_SERVER_ERROR);
+            result.put("success", false);
+            result.put("message", "Database error occurred during operation.");
         }
 
-        response.sendRedirect(request.getContextPath() + "/admin/dashboard");
+        response.getWriter().write(gson.toJson(result));
     }
 }
+
