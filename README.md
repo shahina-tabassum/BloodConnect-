@@ -24,6 +24,30 @@ BloodConnect is a web application built to connect patients/hospitals needing ur
 
 ---
 
+## Application Screenshots
+
+### 1. Landing Homepage
+Beautiful dark-themed landing page built using Tailwind CSS glassmorphic cards and features.
+![Landing Homepage](screenshots/homepage.png)
+
+### 2. Registration Page
+Enables registering as a Requester or Donor, dynamically prompting location and availability settings.
+![Registration Page](screenshots/register.png)
+
+### 3. Donor Dashboard
+Allows donors to manage their personal profile, update availability, and review matched request queues.
+![Donor Dashboard](screenshots/donor_dashboard.png)
+
+### 4. Compatible Match Results
+Displays match results with donor availability status. Phone numbers are fully revealed when the request is verified by an admin.
+![Match Results](screenshots/match_results.png)
+
+### 5. Admin Administration Hub
+Displays user/request statistics, request queue controls, and status update actions with matched donor response tracking.
+![Admin Dashboard](screenshots/admin_dashboard.png)
+
+---
+
 ## Local Setup & Run
 
 ### Prerequisites
