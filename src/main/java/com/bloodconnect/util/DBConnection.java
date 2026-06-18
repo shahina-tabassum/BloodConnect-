@@ -24,10 +24,6 @@ public class DBConnection {
         return (v == null || v.isEmpty()) ? fallback : v;
     }
 
-    /**
-     * Returns a new database connection.
-     * Caller is responsible for closing it (use try-with-resources).
-     */
     public static Connection getConnection() throws SQLException {
         String host = env("MYSQLHOST", "localhost");
         String port = env("MYSQLPORT", "3306");
@@ -38,6 +34,24 @@ public class DBConnection {
         String url = "jdbc:mysql://" + host + ":" + port + "/" + db
                    + "?useSSL=false&allowPublicKeyRetrieval=true&serverTimezone=UTC";
 
-        return DriverManager.getConnection(url, user, pass);
+        try {
+            return DriverManager.getConnection(url, user, pass);
+        } catch (SQLException e) {
+            // If host is not localhost, try local database as a fallback
+            if (!"localhost".equals(host)) {
+                System.out.println("[DBConnection] Warning: Cloud connection to " + host + " failed. Falling back to local database...");
+                String localUrl = "jdbc:mysql://localhost:3306/bloodconnect"
+                                + "?useSSL=false&allowPublicKeyRetrieval=true&serverTimezone=UTC";
+                try {
+                    return DriverManager.getConnection(localUrl, "root", "");
+                } catch (SQLException ex) {
+                    // If local fails too, throw original exception to indicate connection issue
+                    throw e;
+                }
+            } else {
+                throw e;
+            }
+        }
     }
 }
+
