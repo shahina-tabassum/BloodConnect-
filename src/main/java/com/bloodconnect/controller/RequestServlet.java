@@ -144,7 +144,7 @@ public class RequestServlet extends HttpServlet {
             e.printStackTrace();
             response.setStatus(HttpServletResponse.SC_INTERNAL_SERVER_ERROR);
             result.put("success", false);
-            result.put("message", "Failed to update profile due to database error.");
+            result.put("message", "Failed to save blood request due to database error.");
             response.getWriter().write(gson.toJson(result));
         }
     }
